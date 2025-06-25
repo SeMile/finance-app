@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Дашборд за {{ current_month }}</h2>
+
+<!-- Плашки с показателями -->
+<div class="row mb-4">
+    <div class="col-md-4 mb-3">
+        <div class="card text-white bg-success h-100">
+            <div class="card-body">
+                <h5 class="card-title">Доходы</h5>
+                <p class="card-text fs-3">{{ total_income|format_currency }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-3">
+        <div class="card text-white bg-danger h-100">
+            <div class="card-body">
+                <h5 class="card-title">Расходы</h5>
+                <p class="card-text fs-3">{{ total_expense|format_currency }}</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card text-white bg-dark h-100">
+            <div class="card-body">
+                <h5 class="card-title">Кредитный лимит</h5>
+                <p class="card-text fs-3">{{ available_credit|format_currency }}</p>
+                <small class="text-muted">из {{ total_credit|format_currency }}</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Таблица анализа расходов -->
+<div class="card mb-4">
+    <div class="card-header">Анализ расходов</div>
+    <div class="card-body">
+        <table class="table table-bordered">
+            <thead class="table-dark">
+                <tr>
+                    <th>Статья расходов</th>
+                    <th class="text-end">План</th>
+                    <th class="text-end">Факт</th>
+                    <th class="text-end">Разница</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for category in expense_categories %}
+                {% set planned = budget_plans.get(category.id, 0) %}
+                {% set actual = actual_expenses.get(category.id, 0) %}
+                <tr>
+                    <td>{{ category.name }}</td>
+                    <td class="text-end">{{ planned|format_currency }}</td>
+                    <td class="text-end">{{ actual|format_currency }}</td>
+                    <td class="text-end {% if actual > planned %}text-danger{% else %}text-success{% endif %}">
+                        {{ (planned - actual)|format_currency }}
+                    </td>
+                </tr>
+                {% endfor %}
+                <tr class="table-secondary fw-bold">
+                    <td>Итого</td>
+                    <td class="text-end">{{ total_planned|format_currency }}</td>
+                    <td class="text-end">{{ total_actual|format_currency }}</td>
+                    <td class="text-end {% if total_actual > total_planned %}text-danger{% else %}text-success{% endif %}">
+                        {{ (total_planned - total_actual)|format_currency }}
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Графики -->
+<div class="row">
+    <div class="col-md-12">
+        <div class="card mb-4">
+            <div class="card-header">План vs Факт (расходы)</div>
+            <div class="card-body">
+                <canvas id="budgetChart" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">Распределение расходов</div>
+            <div class="card-body">
+                <canvas id="categoryChart" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// График План vs Факт
+const budgetCtx = document.getElementById('budgetChart').getContext('2d');
+const budgetChart = new Chart(budgetCtx, {
+    type: 'bar',
+    data: {
+        labels: [{% for cat in expense_categories %}'{{ cat.name }}',{% endfor %}],
+        datasets: [
+            {
+                label: 'План',
+                data: [{% for cat in expense_categories %}{{ budget_plans.get(cat.id, 0) }},{% endfor %}],
+                backgroundColor: 'rgba(54, 162, 235, 0.7)'
+            },
+            {
+                label: 'Факт',
+                data: [{% for cat in expense_categories %}{{ actual_expenses.get(cat.id, 0) }},{% endfor %}],
+                backgroundColor: 'rgba(255, 99, 132, 0.7)'
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: {
+                    callback: function(value) {
+                        return value + ' ₽';
+                    }
+                }
+            }
+        }
+    }
+});
+
+// Круговая диаграмма расходов
+const categoryCtx = document.getElementById('categoryChart').getContext('2d');
+const categoryChart = new Chart(categoryCtx, {
+    type: 'pie',
+    data: {
+        labels: [{% for cat in expense_categories %}'{{ cat.name }}',{% endfor %}],
+        datasets: [{
+            data: [{% for cat in expense_categories %}{{ actual_expenses.get(cat.id, 0) }},{% endfor %}],
+            backgroundColor: [
+                '#ff6384', '#36a2eb', '#cc65fe', '#ffce56', '#4bc0c0'
+            ]
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            tooltip: {
+                callbacks: {
+                    label: function(context) {
+                        return context.label + ': ' + context.raw + ' ₽';
+                    }
+                }
+            }
+        }
+    }
+});
+</script>
+{% endblock %}
